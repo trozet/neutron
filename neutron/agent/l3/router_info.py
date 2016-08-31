@@ -26,6 +26,7 @@ from neutron.common import exceptions as n_exc
 from neutron.common import ipv6_utils
 from neutron.common import utils as common_utils
 from neutron.ipam import utils as ipam_utils
+from neutron.agent.linux.interface import OVSInterfaceDriver
 
 LOG = logging.getLogger(__name__)
 INTERNAL_DEV_PREFIX = namespaces.INTERNAL_DEV_PREFIX
@@ -46,6 +47,7 @@ class RouterInfo(object):
                  agent_conf,
                  interface_driver,
                  use_ipv6=False):
+        self.ovs_driver = OVSInterfaceDriver(agent_conf)
         self.router_id = router_id
         self.ex_gw_port = None
         self._snat_enabled = None
@@ -56,7 +58,7 @@ class RouterInfo(object):
         self.router = router
         self.use_ipv6 = use_ipv6
         ns = namespaces.RouterNamespace(
-            router_id, agent_conf, interface_driver, use_ipv6)
+            router_id, agent_conf, interface_driver, use_ipv6, self.ovs_driver)
         self.router_namespace = ns
         self.ns_name = ns.name
         self.available_mark_ids = set(range(ADDRESS_SCOPE_MARK_ID_MIN,
@@ -561,7 +563,7 @@ class RouterInfo(object):
                 for ip in floating_ips]
 
     def _plug_external_gateway(self, ex_gw_port, interface_name, ns_name):
-        self.driver.plug(ex_gw_port['network_id'],
+        self.ovs_driver.plug(ex_gw_port['network_id'],
                          ex_gw_port['id'],
                          interface_name,
                          ex_gw_port['mac_address'],
@@ -615,7 +617,7 @@ class RouterInfo(object):
 
         self._add_route_to_gw(ex_gw_port, device_name=interface_name,
                               namespace=ns_name, preserve_ips=preserve_ips)
-        self.driver.init_router_port(
+        self.ovs_driver.init_router_port(
             interface_name,
             ip_cidrs,
             namespace=ns_name,
@@ -663,7 +665,7 @@ class RouterInfo(object):
                                             common_utils.ip_to_cidr(
                                                 ip_addr['ip_address'],
                                                 ip_addr['prefixlen']))
-        self.driver.unplug(interface_name,
+        self.ovs_driver.unplug(interface_name,
                            bridge=self.agent_conf.external_network_bridge,
                            namespace=self.ns_name,
                            prefix=EXTERNAL_DEV_PREFIX)
@@ -697,7 +699,7 @@ class RouterInfo(object):
         for stale_dev in stale_devs:
             LOG.debug('Deleting stale external router device: %s', stale_dev)
             pd.remove_gw_interface(self.router['id'])
-            self.driver.unplug(stale_dev,
+            self.ovs_driver.unplug(stale_dev,
                                bridge=self.agent_conf.external_network_bridge,
                                namespace=self.ns_name,
                                prefix=EXTERNAL_DEV_PREFIX)

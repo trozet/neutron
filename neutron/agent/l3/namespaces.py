@@ -85,8 +85,9 @@ class Namespace(object):
 
 class RouterNamespace(Namespace):
 
-    def __init__(self, router_id, agent_conf, driver, use_ipv6):
+    def __init__(self, router_id, agent_conf, driver, use_ipv6, ovs_driver):
         self.router_id = router_id
+        self.ovs_driver = ovs_driver
         name = self._get_ns_name(router_id)
         super(RouterNamespace, self).__init__(
             name, agent_conf, driver, use_ipv6)
@@ -105,7 +106,7 @@ class RouterNamespace(Namespace):
             elif d.name.startswith(ROUTER_2_FIP_DEV_PREFIX):
                 ns_ip.del_veth(d.name)
             elif d.name.startswith(EXTERNAL_DEV_PREFIX):
-                self.driver.unplug(
+                self.ovs_driver.unplug(
                     d.name,
                     bridge=self.agent_conf.external_network_bridge,
                     namespace=self.name,
